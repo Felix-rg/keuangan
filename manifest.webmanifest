@@ -1,0 +1,17 @@
+{
+  "name": "Keuangan Mandiri",
+  "short_name": "Keuangan",
+  "description": "Pencatatan keuangan pribadi berbasis Google Sheets.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#111827",
+  "icons": [
+    {
+      "src": "/assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "keuangan-mandiri",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Aplikasi keuangan pribadi dengan frontend Vercel dan database Google Sheets via Apps Script.",
+  "scripts": {
+    "hash-password": "node scripts/hash-password.js",
+    "generate-secret": "node scripts/generate-secret.js",
+    "check": "node --check app.js && node --check api/action.js && node --check api/bootstrap.js && node --check api/database.js && node --check api/login.js && node --check api/logout.js && node --check api/session.js && node --check lib/auth.js && node --check lib/gas.js && node --check lib/http.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

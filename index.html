@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <base target="_top">
+  <meta name="theme-color" content="#111827">
+  <meta name="description" content="Aplikasi pencatatan keuangan pribadi yang terhubung ke Google Sheets.">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <section id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="brand-mark login-mark">KM</div>
+        <div><strong>Keuangan Mandiri</strong><span>Personal finance</span></div>
+      </div>
+      <div class="login-copy">
+        <span class="eyebrow">AREA PRIBADI</span>
+        <h1>Masuk ke catatan keuangan</h1>
+        <p>Data tetap tersimpan di Google Sheets milikmu. Repo boleh publik, isi dompet tidak perlu ikut pamer.</p>
+      </div>
+      <form id="loginForm" class="login-form">
+        <label>Password
+          <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Masukkan password" required>
+        </label>
+        <button id="loginButton" class="primary login-button" type="submit">Masuk</button>
+        <p id="loginError" class="login-error hidden"></p>
+      </form>
+    </div>
+  </section>
+  <div id="loading" class="loading"><div class="spinner"></div><span>Memuat data...</span></div>
+  <div id="toast" class="toast"></div>
+
+  <aside class="sidebar app-protected hidden">
+    <div class="brand">
+      <div class="brand-mark">KM</div>
+      <div><strong id="brandName">Keuangan Mandiri</strong><span>Personal finance</span></div>
+    </div>
+    <nav id="nav">
+      <button class="nav-item active" data-page="dashboard">Dashboard</button>
+      <button class="nav-item" data-page="transactions">Transaksi</button>
+      <button class="nav-item" data-page="reports">Laporan</button>
+      <button class="nav-item" data-page="budgets">Budget</button>
+      <button class="nav-item" data-page="goals">Target</button>
+      <button class="nav-item" data-page="debts">Hutang & Piutang</button>
+      <button class="nav-item" data-page="recurring">Berulang</button>
+      <button class="nav-item" data-page="accounts">Akun</button>
+      <button class="nav-item" data-page="settings">Pengaturan</button>
+    </nav>
+    <div class="sidebar-footer"><span>Database</span><button class="link-btn" onclick="openDatabase()">Buka Google Sheets</button><button class="link-btn logout-link" onclick="logout()">Keluar</button></div>
+  </aside>
+
+  <main class="main app-protected hidden">
+    <header class="topbar">
+      <div><h1 id="pageTitle">Dashboard</h1><p id="pageSubtitle">Ringkasan kondisi keuanganmu.</p></div>
+      <div class="topbar-actions"><button class="secondary small logout-top" onclick="logout()">Keluar</button><button class="primary" onclick="quickTransaction()">+ Transaksi</button></div>
+    </header>
+
+    <section id="page-dashboard" class="page active">
+      <div class="metric-grid">
+        <article class="metric-card"><span>Total Saldo</span><strong id="mBalance">Rp0</strong><small>Semua akun aktif</small></article>
+        <article class="metric-card"><span>Pemasukan Bulan Ini</span><strong id="mIncome" class="good">Rp0</strong><small id="mMonth1">-</small></article>
+        <article class="metric-card"><span>Pengeluaran Bulan Ini</span><strong id="mExpense" class="bad">Rp0</strong><small id="mMonth2">-</small></article>
+        <article class="metric-card"><span>Arus Kas Bersih</span><strong id="mNet">Rp0</strong><small id="mSavings">Rasio tabungan 0%</small></article>
+      </div>
+
+      <div class="two-col wide-left">
+        <article class="panel"><div class="panel-head"><div><h2>Arus Kas 6 Bulan</h2><p>Pemasukan vs pengeluaran.</p></div></div><div id="trendChart" class="trend-chart"></div></article>
+        <article class="panel"><div class="panel-head"><div><h2>Posisi Utang</h2><p>Sisa kewajiban dan piutang.</p></div></div><div class="debt-mini"><div><span>Hutang</span><strong id="mDebt" class="bad">Rp0</strong></div><div><span>Piutang</span><strong id="mReceivable" class="good">Rp0</strong></div></div><div id="accountMini" class="stack-list"></div></article>
+      </div>
+
+      <div class="two-col">
+        <article class="panel"><div class="panel-head"><div><h2>Pengeluaran per Kategori</h2><p>Bulan berjalan.</p></div></div><div id="expenseCategory"></div></article>
+        <article class="panel"><div class="panel-head"><div><h2>Transaksi Terbaru</h2><p>Aktivitas terakhir.</p></div></div><div id="recentTransactions" class="stack-list"></div></article>
+      </div>
+    </section>
+
+    <section id="page-transactions" class="page">
+      <div class="panel form-panel">
+        <div class="panel-head"><div><h2 id="txFormTitle">Tambah Transaksi</h2><p>Catat pemasukan, pengeluaran, atau transfer.</p></div></div>
+        <form id="transactionForm" class="form-grid">
+          <input type="hidden" id="txId">
+          <label>Tanggal<input type="date" id="txDate" required></label>
+          <label>Jenis<select id="txType" onchange="syncTransactionForm()"><option>Pemasukan</option><option>Pengeluaran</option><option>Transfer</option></select></label>
+          <label id="txFromWrap">Akun Asal<select id="txFrom"></select></label>
+          <label id="txToWrap">Akun Tujuan<select id="txTo"></select></label>
+          <label id="txCategoryWrap">Kategori<select id="txCategory"></select></label>
+          <label>Nominal<input type="number" id="txAmount" min="1" inputmode="numeric" placeholder="50000" required></label>
+          <label class="span-2">Deskripsi<input id="txDescription" maxlength="150" placeholder="Contoh: makan siang"></label>
+          <label class="span-2">Catatan<textarea id="txNote" maxlength="500" placeholder="Opsional"></textarea></label>
+          <div class="form-actions span-2"><button class="primary" type="submit">Simpan</button><button class="secondary hidden" id="txCancel" type="button" onclick="resetTransactionForm()">Batal Edit</button></div>
+        </form>
+      </div>
+      <div class="panel"><div class="filters"><input id="txSearch" placeholder="Cari transaksi..." oninput="renderTransactions()"><select id="txFilterType" onchange="renderTransactions()"><option value="">Semua jenis</option><option>Pemasukan</option><option>Pengeluaran</option><option>Transfer</option></select><input type="month" id="txFilterMonth" onchange="renderTransactions()"></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Transaksi</th><th>Jenis</th><th>Akun</th><th>Nominal</th><th></th></tr></thead><tbody id="txTable"></tbody></table></div><div id="txEmpty" class="empty hidden">Belum ada transaksi yang cocok.</div></div>
+    </section>
+
+    <section id="page-reports" class="page">
+      <div class="panel">
+        <div class="panel-head"><div><h2>Laporan Bulanan</h2><p>Lihat arus kas satu bulan tanpa perlu menginterogasi seluruh spreadsheet.</p></div><div class="row-actions"><button class="secondary small" onclick="exportReportCSV()">Export CSV</button><button class="secondary small" onclick="window.print()">Cetak</button></div></div>
+        <div class="filters report-filter"><input type="month" id="reportMonth" onchange="renderReport()"></div>
+        <div class="metric-grid report-metrics"><article class="metric-card"><span>Pemasukan</span><strong id="rIncome" class="good">Rp0</strong></article><article class="metric-card"><span>Pengeluaran</span><strong id="rExpense" class="bad">Rp0</strong></article><article class="metric-card"><span>Arus Kas Bersih</span><strong id="rNet">Rp0</strong></article><article class="metric-card"><span>Jumlah Transaksi</span><strong id="rCount">0</strong></article></div>
+      </div>
+      <div class="two-col">
+        <article class="panel"><div class="panel-head"><div><h2>Pengeluaran per Kategori</h2><p id="reportCategorySub">-</p></div></div><div id="reportCategories"></div></article>
+        <article class="panel"><div class="panel-head"><div><h2>Ringkasan Akun</h2><p>Saldo akun saat ini sebagai referensi.</p></div></div><div id="reportAccounts" class="stack-list"></div></article>
+      </div>
+      <div class="panel"><div class="panel-head"><div><h2>Detail Transaksi</h2><p id="reportTxSub">-</p></div></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Deskripsi</th><th>Jenis</th><th>Kategori</th><th>Akun</th><th>Nominal</th></tr></thead><tbody id="reportTable"></tbody></table></div><div id="reportEmpty" class="empty hidden">Tidak ada transaksi pada bulan ini.</div></div>
+    </section>
+
+    <section id="page-budgets" class="page">
+      <div class="two-col wide-left">
+        <article class="panel"><div class="panel-head"><div><h2>Budget Bulanan</h2><p>Batas pengeluaran per kategori.</p></div></div><form id="budgetForm" class="form-grid compact"><input type="hidden" id="budgetId"><label>Bulan<input type="month" id="budgetMonth" required></label><label>Kategori<select id="budgetCategory"></select></label><label class="span-2">Batas<input type="number" id="budgetLimit" min="1" required></label><div class="form-actions span-2"><button class="primary" type="submit">Simpan Budget</button><button class="secondary hidden" id="budgetCancel" type="button" onclick="resetBudgetForm()">Batal</button></div></form></article>
+        <article class="panel"><div class="panel-head"><div><h2>Prinsip sederhana</h2><p>Budget bukan hukuman. Dia pagar supaya duit nggak kabur sambil dadah-dadah.</p></div></div><div class="hint-box">Fokus dulu ke 3-5 kategori terbesar. Terlalu banyak batas sejak hari pertama biasanya cuma menghasilkan tabel cantik yang diabaikan.</div></article>
+      </div>
+      <div id="budgetCards" class="card-grid"></div>
+    </section>
+
+    <section id="page-goals" class="page">
+      <div class="panel form-panel"><div class="panel-head"><div><h2 id="goalFormTitle">Target Keuangan</h2><p>Tabungan, dana darurat, beli barang, dan tujuan lain.</p></div></div><form id="goalForm" class="form-grid"><input type="hidden" id="goalId"><label>Nama Target<input id="goalName" maxlength="100" required></label><label>Target Nominal<input type="number" id="goalTarget" min="1" required></label><label>Deadline<input type="date" id="goalDeadline"></label><label class="span-2">Catatan<textarea id="goalNote" maxlength="500"></textarea></label><div class="form-actions span-2"><button class="primary" type="submit">Simpan Target</button><button class="secondary hidden" id="goalCancel" type="button" onclick="resetGoalForm()">Batal</button></div></form></div>
+      <div id="goalCards" class="card-grid"></div>
+    </section>
+
+    <section id="page-debts" class="page">
+      <div class="panel form-panel"><div class="panel-head"><div><h2 id="debtFormTitle">Hutang & Piutang</h2><p>Catat nominal, pihak, dan pembayaran.</p></div></div><form id="debtForm" class="form-grid"><input type="hidden" id="debtId"><label>Jenis<select id="debtDirection"><option>Hutang</option><option>Piutang</option></select></label><label>Pihak<input id="debtParty" maxlength="100" required></label><label>Nominal Pokok<input type="number" id="debtPrincipal" min="1" required></label><label>Jatuh Tempo<input type="date" id="debtDue"></label><label>Akun Default<select id="debtAccount"></select></label><label>Deskripsi<input id="debtDescription" maxlength="150"></label><label class="span-2">Catatan<textarea id="debtNote" maxlength="500"></textarea></label><div class="form-actions span-2"><button class="primary" type="submit">Simpan</button><button class="secondary hidden" id="debtCancel" type="button" onclick="resetDebtForm()">Batal</button></div></form></div>
+      <div id="debtCards" class="card-grid"></div>
+    </section>
+
+    <section id="page-recurring" class="page">
+      <div class="panel form-panel"><div class="panel-head"><div><h2 id="recFormTitle">Transaksi Berulang</h2><p>Tagihan, uang saku, pemasukan rutin, dan transfer otomatis.</p></div><button class="secondary small" type="button" onclick="runRecurringNowUI()">Proses Sekarang</button></div><form id="recurringForm" class="form-grid"><input type="hidden" id="recId"><label>Nama<input id="recName" maxlength="100" required></label><label>Jenis<select id="recType" onchange="syncRecurringForm()"><option>Pemasukan</option><option>Pengeluaran</option><option>Transfer</option></select></label><label id="recFromWrap">Akun Asal<select id="recFrom"></select></label><label id="recToWrap">Akun Tujuan<select id="recTo"></select></label><label id="recCategoryWrap">Kategori<select id="recCategory"></select></label><label>Nominal<input type="number" id="recAmount" min="1" required></label><label>Frekuensi<select id="recFrequency"><option>Mingguan</option><option>Bulanan</option><option>Tahunan</option></select></label><label>Tanggal Berikut<input type="date" id="recNext" required></label><label>Tanggal Akhir<input type="date" id="recEnd"></label><label class="span-2">Catatan<textarea id="recNote"></textarea></label><div class="form-actions span-2"><button class="primary" type="submit">Simpan</button><button class="secondary hidden" id="recCancel" type="button" onclick="resetRecurringForm()">Batal</button></div></form></div>
+      <div class="table-wrap panel"><table><thead><tr><th>Nama</th><th>Jenis</th><th>Nominal</th><th>Frekuensi</th><th>Berikutnya</th><th>Status</th><th></th></tr></thead><tbody id="recTable"></tbody></table></div>
+    </section>
+
+    <section id="page-accounts" class="page">
+      <div class="two-col wide-left"><article class="panel"><div class="panel-head"><div><h2 id="accountFormTitle">Tambah Akun</h2><p>Tunai, bank, e-wallet, atau akun lain.</p></div></div><form id="accountForm" class="form-grid compact"><input type="hidden" id="accountId"><label>Nama<input id="accountName" required></label><label>Tipe<select id="accountType"><option>Tunai</option><option>Bank</option><option>E-Wallet</option><option>Tabungan</option><option>Lainnya</option></select></label><label class="span-2">Saldo Awal<input type="number" id="accountOpening" value="0"></label><div class="form-actions span-2"><button class="primary" type="submit">Simpan Akun</button><button class="secondary hidden" id="accountCancel" type="button" onclick="resetAccountForm()">Batal</button></div></form></article><article class="panel"><div class="panel-head"><div><h2>Total Dana</h2><p>Saldo berasal dari saldo awal + ledger transaksi.</p></div></div><strong id="accountTotal" class="hero-number">Rp0</strong></article></div>
+      <div id="accountCards" class="card-grid"></div>
+    </section>
+
+    <section id="page-settings" class="page">
+      <div class="two-col">
+        <article class="panel"><div class="panel-head"><div><h2>Identitas Aplikasi</h2><p>Pengaturan tampilan dasar.</p></div></div><form id="settingsForm" class="form-grid compact"><label>Nama Aplikasi<input id="settingAppName"></label><label>Nama Pemilik<input id="settingOwnerName"></label><div class="form-actions span-2"><button class="primary" type="submit">Simpan Pengaturan</button></div></form></article>
+        <article class="panel"><div class="panel-head"><div><h2>Kategori</h2><p>Tambah kategori sendiri. Kategori lama cukup diarsipkan agar histori tetap aman.</p></div></div><form id="categoryForm" class="form-grid compact"><input type="hidden" id="categoryId"><label>Jenis<select id="categoryType"><option>Pemasukan</option><option>Pengeluaran</option></select></label><label>Nama<input id="categoryName" required></label><div class="form-actions span-2"><button class="primary" type="submit">Simpan Kategori</button><button class="secondary hidden" id="categoryCancel" type="button" onclick="resetCategoryForm()">Batal</button></div></form><div id="categoryList" class="stack-list top-gap"></div></article>
+      </div>
+      <article class="panel top-gap"><div class="panel-head"><div><h2>Database</h2><p>Semua data ada di Google Sheets milikmu.</p></div><button class="secondary" onclick="openDatabase()">Buka Spreadsheet</button></div><div id="dbInfo" class="mono-box">Memuat...</div></article>
+    </section>
+  </main>
+
+  <noscript><div class="noscript">JavaScript harus aktif untuk menjalankan aplikasi ini.</div></noscript>
+
+  <div id="modal" class="modal hidden"><div class="modal-card"><button class="modal-close" onclick="closeModal()">×</button><div id="modalContent"></div></div></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>
